@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
+
+
+# standard imports
+
+# thrid-party imports
 from math import ceil
 import os
-import numpy as np
 
+# local imports
+import numpy as np
 from torch.utils.data import IterableDataset
 
 
@@ -13,8 +19,10 @@ class MMnistIterator:
         self.chunk = []
         self.chunk_iterator = iter(self.chunk)
 
+
     def __iter__(self):
         return self
+
 
     def __next__(self):
         if self.chunk_iterator.__length_hint__() == 0:
@@ -32,8 +40,10 @@ class MMnistDataset(IterableDataset):
         self.dirname = dirname
         self.batch_size = batch_size
 
+
     def __iter__(self):
         return MMnistIterator(self.dirname)
+
 
     def __len__(self):
         return ceil(len(os.listdir(self.dirname)) * 1000 / self.batch_size)
