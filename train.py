@@ -8,6 +8,8 @@ import torch
 from torch.utils.data import DataLoader
 from torch import nn
 import torch.nn.functional as F
+from torchsummary import summary
+
 
 # local imports
 from dataset import MMnistDataset
@@ -17,16 +19,40 @@ from trainer import Trainer
 class UNet(nn.Module):
     def __init__(self):
         super(UNet, self).__init__()
-        self.conv1_1 = nn.Conv2d(10, 32, 3, padding=1)
-        self.conv1_2 = nn.Conv2d(32, 64, 3, padding=1)
-        self.maxpool = nn.MaxPool2d(2)
+        self.conv1_1 = nn.Conv2d(10, 64, 3, padding=1)
+        self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
+        self.maxpool1 = nn.MaxPool2d(2)
 
         self.conv2_1 = nn.Conv2d(64, 128, 3, padding=1)
         self.conv2_2 = nn.Conv2d(128, 128, 3, padding=1)
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.maxpool2 = nn.MaxPool2d(2)
 
-        self.conv3_1 = nn.Conv2d(128+64, 64, 3, padding=1)
-        self.conv3_2 = nn.Conv2d(64, 10, 3, padding=1)
+        self.conv3_1 = nn.Conv2d(128, 256, 3, padding=1)
+        self.conv3_2 = nn.Conv2d(256, 256, 3, padding=1)
+        self.maxpool3 = nn.MaxPool2d(2)
+
+        self.conv4_1 = nn.Conv2d(256, 512, 3, padding=1)
+        self.conv4_2 = nn.Conv2d(512, 512, 3, padding=1)
+        self.maxpool4 = nn.MaxPool2d(2)
+
+        self.conv5_1 = nn.Conv2d(512, 1024, 3, padding=1)
+        self.conv5_2 = nn.Conv2d(1024, 512, 3, padding=1)
+        self.up5 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.conv6_1 = nn.Conv2d(1024, 512, 3, padding=1)
+        self.conv6_2 = nn.Conv2d(512, 256, 3, padding=1)
+        self.up6 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.conv7_1 = nn.Conv2d(512, 256, 3, padding=1)
+        self.conv7_2 = nn.Conv2d(256, 128, 3, padding=1)
+        self.up7 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.conv8_1 = nn.Conv2d(256, 128, 3, padding=1)
+        self.conv8_2 = nn.Conv2d(128, 64, 3, padding=1)
+        self.up8 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.conv9_1 = nn.Conv2d(128, 64, 3, padding=1)
+        self.conv9_2 = nn.Conv2d(64, 10, 3, padding=1)
 
 
     def forward(self, x):
@@ -36,20 +62,59 @@ class UNet(nn.Module):
         x = F.relu(x)
         x = self.conv1_2(x)
         x1 = F.relu(x)
-        x = self.maxpool(x1)
+        x = self.maxpool1(x1)
 
         x = self.conv2_1(x)
         x = F.relu(x)
         x = self.conv2_2(x)
-        x = F.relu(x)
-        x2 = self.up(x)
-
-        x = torch.cat([x2, x1], dim=1)
+        x2 = F.relu(x)
+        x = self.maxpool2(x2)
 
         x = self.conv3_1(x)
         x = F.relu(x)
         x = self.conv3_2(x)
+        x3 = F.relu(x)
+        x = self.maxpool3(x3)
+
+        x = self.conv4_1(x)
+        x = F.relu(x)
+        x = self.conv4_2(x)
+        x4 = F.relu(x)
+        x = self.maxpool4(x4)
+
+        x = self.conv5_1(x)
+        x = F.relu(x)
+        x = self.conv5_2(x)
+        x = F.relu(x)
+        x5 = self.up5(x)
+
+        x = torch.cat([x5, x4], dim=1)
+        x = self.conv6_1(x)
+        x = F.relu(x)
+        x = self.conv6_2(x)
+        x = F.relu(x)
+        x6 = self.up6(x)
+
+        x = torch.cat([x6, x3], dim=1)
+        x = self.conv7_1(x)
+        x = F.relu(x)
+        x = self.conv7_2(x)
+        x = F.relu(x)
+        x7 = self.up7(x)
+
+        x = torch.cat([x7, x2], dim=1)
+        x = self.conv8_1(x)
+        x = F.relu(x)
+        x = self.conv8_2(x)
+        x = F.relu(x)
+        x8 = self.up8(x)
+
+        x = torch.cat([x8, x1], dim=1)
+        x = self.conv9_1(x)
+        x = F.relu(x)
+        x = self.conv9_2(x)
         x = torch.sigmoid(x)
+
         x = torch.reshape(x, (-1, 10, 1, 64,64))
 
         return x
@@ -74,7 +139,8 @@ if '__main__' == __name__:
 
     model = UNet()
     criterion = nn.MSELoss(reduction='sum')
-    optimizer = torch.optim.SGD
+    optimizer = torch.optim.Adam
+    summary(model, (10, 1, 64, 64), device='cpu')
 
     trainer =  Trainer(model, criterion, optimizer, lr=1e-4, use_gpu=True, metric_functions=[mse1])
-    trainer.train(train_dataloader, valid_dataloader, 10)
+    trainer.train(train_dataloader, valid_dataloader, 100)

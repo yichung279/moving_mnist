@@ -47,6 +47,7 @@ class Trainer():
         self.running_metrics = [0 for i in self.metric_functions] if self.metric_functions else None
 
         progress_bar = tqdm(train_dataloader)
+        progress_bar.set_description('Train')
         for i, (x_train, y_train) in enumerate(progress_bar):
             loss = self.evalute_batch(x_train, y_train)
 
@@ -68,6 +69,7 @@ class Trainer():
         self.running_metrics = [0 for i in self.metric_functions] if self.metric_functions else None
 
         progress_bar = tqdm(valid_dataloader)
+        progress_bar.set_description('Valid')
         for i, (x_valid, y_valid) in enumerate(progress_bar):
             with torch.no_grad():
                 self.evalute_batch(x_valid, y_valid)
