@@ -4,6 +4,7 @@
 # standard imports
 
 # thrid-party imports
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import torch
 
@@ -23,6 +24,7 @@ class Trainer():
         self.callback = callback
         self.running_loss = 0
         self.running_metrics = [0 for i in self.metric_functions] if self.metric_functions else None
+        self.writer = SummaryWriter()
 
 
     def train(self, train_dataloader, valid_dataloader, n_epoch=30):
@@ -30,6 +32,14 @@ class Trainer():
             print(f'Epoch {i+1}:')
             train_loss, train_metrics = self.train_epoch(train_dataloader)
             valid_loss, valid_metrics = self.validate_epoch(valid_dataloader)
+
+            self.writer.add_scalar('loss/train', train_loss, i)
+            for metric_function, metric in zip(self.metric_functions, train_metrics):
+                self.writer.add_scalar(f'{metric_function.__name__}/train', metric, i)
+
+            self.writer.add_scalar('loss/valid', valid_loss, i)
+            for metric_function, metric in zip(self.metric_functions, valid_metrics):
+                self.writer.add_scalar(f'{metric_function.__name__}/valid', metric, i)
 
 
     def train_epoch(self, train_dataloader):
@@ -47,8 +57,8 @@ class Trainer():
             mean_loss = self.running_loss / (i+1)
             mean_metrics = [metric / (i+1) for metric in self.running_metrics] if self.metric_functions else None
 
-            train_metrics = [f'{metric:.2f}' for metric in mean_metrics] if self.metric_functions else None
-            progress_bar.set_postfix_str(f'train_loss: {mean_loss:.2f}, train_metrics: {train_metrics}')
+            train_metrics = [f'{metric:.3f}' for metric in mean_metrics] if self.metric_functions else None
+            progress_bar.set_postfix_str(f'train_loss: {mean_loss:.3f}, train_metrics: {train_metrics}')
 
         return mean_loss, mean_metrics
 
@@ -65,8 +75,8 @@ class Trainer():
             mean_loss = self.running_loss / (i+1)
             mean_metrics = [metric / (i+1) for metric in self.running_metrics] if self.metric_functions else None
 
-            valid_metrics = [f'{metric:.2f}' for metric in mean_metrics] if self.metric_functions else None
-            progress_bar.set_postfix_str(f'valid_loss: {mean_loss:.2f}, valid_metrics: {valid_metrics}')
+            valid_metrics = [f'{metric:.3f}' for metric in mean_metrics] if self.metric_functions else None
+            progress_bar.set_postfix_str(f'valid_loss: {mean_loss:.3f}, valid_metrics: {valid_metrics}')
 
         return mean_loss, mean_metrics
 
