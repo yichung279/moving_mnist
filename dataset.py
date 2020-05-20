@@ -27,7 +27,7 @@ class MMnistIterator:
     def __next__(self):
         if self.chunk_iterator.__length_hint__() == 0:
             path = os.path.join(self.dirname, next(self.fnames))
-            chunk = np.load(path)
+            chunk = np.load(path) / 255
             self.chunk = np.swapaxes(chunk, 0, 1)
             self.chunk_iterator = iter(self.chunk)
         data = next(self.chunk_iterator)

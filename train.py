@@ -49,11 +49,16 @@ class UNet(nn.Module):
         x = self.conv3_1(x)
         x = F.relu(x)
         x = self.conv3_2(x)
-        x = F.sigmoid(x)
-        x = torch.reshape(x, (-1, 1, 10, 64,64))
+        x = torch.sigmoid(x)
+        x = torch.reshape(x, (-1, 10, 1, 64,64))
 
         return x
 
+def mse1(y_pred, y):
+    e = y_pred.sub(y)
+    se = torch.pow(e, 2)
+    mse = torch.mean(se)
+    return mse
 
 if '__main__' == __name__:
 
@@ -71,5 +76,5 @@ if '__main__' == __name__:
     criterion = nn.MSELoss(reduction='sum')
     optimizer = torch.optim.SGD
 
-    trainer =  Trainer(model, criterion, optimizer, lr=1e-4, use_gpu=True)
+    trainer =  Trainer(model, criterion, optimizer, lr=1e-4, use_gpu=True, metric_functions=[mse1])
     trainer.train(train_dataloader, valid_dataloader, 10)
