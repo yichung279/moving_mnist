@@ -129,6 +129,7 @@ def mse(y_pred, y):
     return mse
 
 if '__main__' == __name__:
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     train_dataset = MMnistDataset('/local/mnist_data/train/', 100)
     train_dataloader = DataLoader(train_dataset,
@@ -148,9 +149,10 @@ if '__main__' == __name__:
     model = UNet()
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam
+
     summary(model, (10, 1, 64, 64), device='cpu')
 
-    trainer =  Trainer(model, criterion, optimizer, lr=1e-4, with_gpu=True, metric_functions=[mse])
+    trainer =  Trainer(model, criterion, optimizer, 1e-4, device, metric_functions=[mse])
     trainer.train(train_dataloader, valid_dataloader, 1)
 
     model = trainer.get_model()
@@ -159,18 +161,15 @@ if '__main__' == __name__:
     y_true = np.array([])
     print('Testing:')
     for x_test, y_test in tqdm(test_dataloader):
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         x_test = x_test.to(device)
-        y_test = y_test.to(device)
+        y_test = y_test.numpy().reshape((-1, ))
 
         with torch.no_grad():
             output = model(x_test)
 
             output = output.reshape((-1, ))
-            y_test = y_test.reshape((-1, ))
 
             output = output.cpu().detach().numpy()
-            y_test = y_test.cpu().detach().numpy()
 
             y_pred = np.append(y_pred, output)
             y_true = np.append(y_true, y_test)

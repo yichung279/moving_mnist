@@ -14,14 +14,11 @@ from torch import nn
 
 
 class Trainer():
-    def __init__(self, model, criterion, optimizer, lr, metric_functions, with_gpu=True):
-        self.device = torch.device('cpu')
-        if with_gpu:
-            self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-        self.model = model.to(self.device)
+    def __init__(self, model, criterion, optimizer, lr, metric_functions, device=torch.device('cpu'), with_gpu=True):
+        self.model = model.to(device)
         self.criterion = criterion
         self.optimizer = optimizer(self.model.parameters(), lr=lr)
+        self.device = device
         self.metric_functions = metric_functions
         self.performance = self.default_performance()
         self.running_loss = 0
@@ -64,7 +61,6 @@ class Trainer():
             self.optimizer.zero_grad()
 
             self.performance['loss'] = round(self.running_loss/(i+1), 3)
-            # mean_metrics = {fn.__name__: round(metric/(i+1), 3) for fn, metric in zip(self.metric_functions, self.running_metrics)}\
             if self.metric_functions:
                 for fn, metric in zip(self.metric_functions, self.running_metrics):
                     self.performance[fn.__name__] = round(metric/(i+1), 3)
