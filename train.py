@@ -4,11 +4,13 @@
 # standard imports
 
 # thrid-party imports
+import numpy as np
 import torch
-from torch.utils.data import DataLoader
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+from torch.utils.data import DataLoader
 from torchsummary import summary
+from sklearn.metrics import mean_squared_error
 
 
 # local imports
@@ -127,20 +129,49 @@ def mse1(y_pred, y):
 
 if '__main__' == __name__:
 
-    train_dataset = MMnistDataset('/local/mnist_data/train/', 32)
+    train_dataset = MMnistDataset('/local/mnist_data/train/', 100)
     train_dataloader = DataLoader(train_dataset,
             batch_size=train_dataset.batch_size,
             collate_fn=None)
 
-    valid_dataset = MMnistDataset('/local/mnist_data/valid/', 32)
+    valid_dataset = MMnistDataset('/local/mnist_data/valid/', 100)
     valid_dataloader = DataLoader(valid_dataset,
             batch_size=valid_dataset.batch_size,
             collate_fn=None)
 
+    test_dataset = MMnistDataset('/local/mnist_data/test/', 100)
+    test_dataloader = DataLoader(test_dataset,
+            batch_size=test_dataset.batch_size,
+            collate_fn=None)
+
     model = UNet()
-    criterion = nn.MSELoss(reduction='sum')
+    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam
     summary(model, (10, 1, 64, 64), device='cpu')
 
-    trainer =  Trainer(model, criterion, optimizer, lr=1e-4, use_gpu=True, metric_functions=[mse1])
-    trainer.train(train_dataloader, valid_dataloader, 100)
+    trainer =  Trainer(model, criterion, optimizer, lr=1e-4, with_gpu=True, metric_functions=[mse1])
+    trainer.train(train_dataloader, valid_dataloader, 1)
+
+    model = trainer.get_model()
+
+    y_pred = np.array([])
+    y_true = np.array([])
+    for x_test, y_test in test_dataloader:
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        x_test = x_test.to(device)
+        y_test = y_test.to(device)
+
+        with torch.no_grad():
+            output = model(x_test)
+
+            output = output.reshape((-1, ))
+            y_test = y_test.reshape((-1, ))
+
+            output = output.cpu().detach().numpy()
+            y_test = y_test.cpu().detach().numpy()
+
+            y_pred = np.append(y_pred, output)
+            y_true = np.append(y_true, y_test)
+    print(mean_squared_error(y_true, y_pred))
+
+
