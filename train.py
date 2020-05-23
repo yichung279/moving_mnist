@@ -4,6 +4,7 @@
 # standard imports
 
 # thrid-party imports
+from tqdm import tqdm
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -121,7 +122,7 @@ class UNet(nn.Module):
 
         return x
 
-def mse1(y_pred, y):
+def mse(y_pred, y):
     e = y_pred.sub(y)
     se = torch.pow(e, 2)
     mse = torch.mean(se)
@@ -149,14 +150,15 @@ if '__main__' == __name__:
     optimizer = torch.optim.Adam
     summary(model, (10, 1, 64, 64), device='cpu')
 
-    trainer =  Trainer(model, criterion, optimizer, lr=1e-4, with_gpu=True, metric_functions=[mse1])
+    trainer =  Trainer(model, criterion, optimizer, lr=1e-4, with_gpu=True, metric_functions=[mse])
     trainer.train(train_dataloader, valid_dataloader, 1)
 
     model = trainer.get_model()
 
     y_pred = np.array([])
     y_true = np.array([])
-    for x_test, y_test in test_dataloader:
+    print('Testing:')
+    for x_test, y_test in tqdm(test_dataloader):
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         x_test = x_test.to(device)
         y_test = y_test.to(device)
@@ -172,6 +174,6 @@ if '__main__' == __name__:
 
             y_pred = np.append(y_pred, output)
             y_true = np.append(y_true, y_test)
-    print(mean_squared_error(y_true, y_pred))
+    print(f'mse: {mean_squared_error(y_true, y_pred)}')
 
 
