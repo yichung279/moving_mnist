@@ -2,6 +2,9 @@
 
 
 # standard imports
+from sys import argv
+import os
+
 
 # thrid-party imports
 from tqdm import tqdm
@@ -129,6 +132,9 @@ def mse(y_pred, y):
     return mse
 
 if '__main__' == __name__:
+    model_name = argv[1] if len(argv) > 1 else 'test'
+    SAVING_MODEL = True
+
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     train_dataset = MMnistDataset('/local/mnist_data/train/', 100)
@@ -152,10 +158,12 @@ if '__main__' == __name__:
 
     summary(model, (10, 1, 64, 64), device='cpu')
 
-    trainer =  Trainer(model, criterion, optimizer, 1e-4, device, metric_functions=[mse])
-    trainer.train(train_dataloader, valid_dataloader, 1)
+    log_dir = f'runs/{model_name}'
+    trainer =  Trainer(model, criterion, optimizer, 1e-4, metric_functions=[mse], log_dir=log_dir, patient=0, device=device)
+    # model, criterion, optimizer, lr, metric_functions, log_dir=None, patient=30, device=torch.device('cpu')
+    trainer.train(train_dataloader, valid_dataloader, 20)
 
-    model = trainer.get_model()
+    model = trainer.get_best_model()
 
     y_pred = np.array([])
     y_true = np.array([])
@@ -173,6 +181,15 @@ if '__main__' == __name__:
 
             y_pred = np.append(y_pred, output)
             y_true = np.append(y_true, y_test)
-    print(f'mse: {mean_squared_error(y_true, y_pred)}')
+    mse = mean_squared_error(y_true, y_pred)
+    print(f'mse: {mse}')
 
+    if SAVING_MODEL:
+        if not os.path.isdir('param/'):
+            os.mkdir('param/')
+        torch.save(model.state_dict(), f'param/{model_name}_{mse}.pkl')
+        print(f'Save model as param/{model_name}_{mse}.pkl')
+
+    # model = UNet().to(device)
+    # model.load_state_dict(torch.load(f'param/{model_name}_{mse}.pkl', map_location=device))
 

@@ -14,16 +14,20 @@ from torch import nn
 
 
 class Trainer():
-    def __init__(self, model, criterion, optimizer, lr, metric_functions, device=torch.device('cpu'), with_gpu=True):
-        self.model = model.to(device)
+    def __init__(self, model, criterion, optimizer, lr, metric_functions=None, log_dir=None, patient=30, device=torch.device('cpu')):
+        self.device = device
+        self.model = model.to(self.device)
         self.criterion = criterion
         self.optimizer = optimizer(self.model.parameters(), lr=lr)
-        self.device = device
         self.metric_functions = metric_functions
         self.performance = self.default_performance()
         self.running_loss = 0
         self.running_metrics = [0 for i in self.metric_functions] if self.metric_functions else None
-        self.writer = SummaryWriter()
+        self.writer = SummaryWriter(log_dir)
+        self.default_patient = patient
+        self.patient = patient
+        self.best_model = None
+        self.best_valid_loss = float('inf')
 
 
     def default_performance(self):
@@ -42,9 +46,24 @@ class Trainer():
             for key in self.performance:
                 self.writer.add_scalar(f'{key}/train', self.performance[key], i)
 
+            if self.performance['loss'] < self.best_valid_loss:
+                self.best_model = self.model
+                self.best_valid_loss = self.performance['loss']
+                self.patient =  self.default_patient
+            else:
+                self.patient -= 1
+            print(self.patient)
+
+            if self.patient == 0:
+                break
+
 
     def get_model(self):
         return self.model
+
+
+    def get_best_model(self):
+        return self.best_model
 
 
     def train_epoch(self, train_dataloader):
