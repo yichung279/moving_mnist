@@ -36,7 +36,7 @@ class MMnistIterator:
 
 class MMnistDataset(IterableDataset):
     def __init__(self, dirname, batch_size=1):
-        super(MMnistDataset, self).__init__()
+        super().__init__()
         self.dirname = dirname
         self.batch_size = batch_size
 

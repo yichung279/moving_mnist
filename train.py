@@ -20,11 +20,12 @@ from sklearn.metrics import mean_squared_error
 # local imports
 from dataset import MMnistDataset
 from trainer import Trainer
+from transformer.Transformer import Transformer
 
 
 class UNet(nn.Module):
     def __init__(self):
-        super(UNet, self).__init__()
+        super().__init__()
         self.conv1_1 = nn.Conv2d(10, 64, 3, padding=1)
         self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
         self.maxpool1 = nn.MaxPool2d(2)
@@ -152,7 +153,8 @@ if '__main__' == __name__:
             batch_size=test_dataset.batch_size,
             collate_fn=None)
 
-    model = UNet()
+    # model = UNet()
+    model = Transformer()
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam
 
