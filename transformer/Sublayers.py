@@ -12,7 +12,7 @@ import torch.nn.functional as F
 # local imports
 
 def scaled_dot_product_attention(query, key, value):
-    ''' scaled_dot_product_attention of sequntial images
+    ''' scaled_dot_product_attention of images
 
     Parameters:
         query: from image_t
@@ -48,7 +48,7 @@ class MultiHeadImageAttentionBlock(nn.Module):
     Concatenate output of all scaled_dot_product_attention, and apply output convolution layer.
     Apply residaul shortcut and layer normalization,
 
-    Parameters:
+    Attribute:
         n_head:
             number of attention layers running in parallel
         d_image:
@@ -67,6 +67,17 @@ class MultiHeadImageAttentionBlock(nn.Module):
             dropout_rate of output convolution layer
 
     Forward:
+        Parameters:
+            query_image:
+                shape = (batch_size, channel, height, width)
+            key:
+                shape = (batch_size, channel, height, width)
+        Return:
+            x:
+                output of MultiHeadImageAttentionBlock
+            attention:
+                attention map of query_image and key_images, meaning attention between each pixel of query_image and key_images
+
     '''
     def __init__(self, n_head, d_image, d_k, d_v, height, width, kernel_size=3, dropout_rate=0.1):
         super().__init__()
@@ -87,14 +98,12 @@ class MultiHeadImageAttentionBlock(nn.Module):
         self.layer_norm = nn.LayerNorm((d_image, height, width), eps=1e-6) #! maybe BatchNorm?
 
 
-    def forward(self, query_image, seq_images):
+    def forward(self, query_image, key_image):
         residaul_shortcut = query_image
 
         query = self.conv_q(query_image).reshape(-1, self.n_head, self.d_k, self.height*self.width)
-        keys = [self.conv_k(img).reshape(-1, self.n_head, self.d_k, self.height*self.width) for img in seq_images]
-        key = torch.cat(keys, dim=-1)
-        values = [self.conv_v(img).reshape(-1, self.n_head, self.d_v, self.height*self.width) for img in seq_images]
-        value = torch.cat(values, dim=-1)
+        key = self.conv_q(key_image).reshape(-1, self.n_head, self.d_k, self.height*self.width)
+        value = self.conv_v(key_image).reshape(-1, self.n_head, self.d_v, self.height*self.width)
 
         query, key, value = query.transpose(-2, -1), key.transpose(-2, -1), value.transpose(-2, -1)
 
@@ -111,13 +120,24 @@ class MultiHeadImageAttentionBlock(nn.Module):
         return x, attention
 
 
-class ConvBlock(nn.Module):
-    def __init__(self, in_channel, hidden_channel, kernel_size=3):
+class FeedForwardConvBlock(nn.Module):
+    '''  FeedForward Convolution module
+
+    Features compute with a two layer cnn network
+
+    Attribute:
+        in_channel:
+            channel size of intput feature
+        hidden_channel:
+            channel size of hidden layer
+        kernel_size:
+            kernel size of convolution layer
+    '''
+    def __init__(self, in_channel, hidden_channel, kernel_size=3, dropout_rate=0.1):
         super().__init__()
         self.conv_1 = nn.Conv2d(in_channel, hidden_channel, kernel_size, padding=kernel_size//2)
         self.conv_2 = nn.Conv2d(hidden_channel, in_channel, kernel_size, padding=kernel_size//2)
 
-        self.layer_norm = nn.LayerNorm(in_channel, eps=1e-6)
         self.dropout = nn.Dropout(dropout_rate)
 
 
@@ -127,23 +147,24 @@ class ConvBlock(nn.Module):
         x = F.relu(self.conv_1(x))
         x = self.dropout(self.conv_2(x))
 
-        x = self.layer_norm(x + residaul)
+        layer_norm = nn.LayerNorm(x.shape[1:], eps=1e-6)
+        x = layer_norm(x + residaul)
 
         return x
 
 
 class DownSample(nn.Module):
-    def __init__(self):
-        super().__init__(in_channel, hidden_channel, kernel_size=3)
+    def __init__(self,in_channel, hidden_channel, out_channel, kernel_size=3):
+        super().__init__()
         self.downsample = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
-        self.conv_1x1 = nn.Conv2d(in_channel, hidden_channel, kernel_size=1)
+        self.conv_1x1 = nn.Conv2d(in_channel, out_channel, 1)
 
         self.conv_1 = nn.Conv2d(in_channel, hidden_channel, kernel_size, padding=kernel_size//2)
-        self.bn_1 = nn.BatchNorm2d(in_channel)
+        self.bn_1 = nn.BatchNorm2d(hidden_channel)
 
-        self.conv_2 = nn.Conv2d(hidden_channel, hidden_channel, kernel_size, padding=kernel_size//2)
-        self.bn_2 = nn.BatchNorm2d(hidden_channel)
+        self.conv_2 = nn.Conv2d(hidden_channel, out_channel, kernel_size, padding=kernel_size//2)
+        self.bn_2 = nn.BatchNorm2d(out_channel)
 
 
     def forward(self, x):
@@ -162,21 +183,23 @@ class DownSample(nn.Module):
 
 
 class UpSample(nn.Module):
-    def __init__(self, in_channel, hidden_channel, kernel_size=3):
+    def __init__(self, in_channel, hidden_channel, out_channel, kernel_size=3):
         super().__init__()
-        self.upsample = nn.ConvTranspose2d(in_channel, hidden_channel, kernel_size=2, stride=2)
+        self.upsample = nn.ConvTranspose2d(in_channel, in_channel, kernel_size=2, stride=2)
 
-        self.conv_1 = nn.Conv2d(hidden_channel, hidden_channel, kernel_size, padding=kernel_size//2)
+        self.conv_1x1 = nn.Conv2d(in_channel, out_channel, 1)
+
+        self.conv_1 = nn.Conv2d(in_channel, hidden_channel, kernel_size, padding=kernel_size//2)
         self.bn_1 = nn.BatchNorm2d(hidden_channel)
 
-        self.conv_2 = nn.Conv2d(hidden_channel, hidden_channel, kernel_size, padding=kernel_size//2)
-        self.bn_2 = nn.BatchNorm2d(hidden_channel)
+        self.conv_2 = nn.Conv2d(hidden_channel, out_channel, kernel_size, padding=kernel_size//2)
+        self.bn_2 = nn.BatchNorm2d(out_channel)
 
 
     def forward(self, x):
         x = self.upsample(x)
 
-        identity = x
+        identity = self.conv_1x1(x)
 
         x = self.conv_1(x)
         x = self.bn_1(x)
@@ -189,14 +212,16 @@ class UpSample(nn.Module):
 
 
 if '__main__' == __name__:
-    print(torch.cuda.is_available())
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     query_image = torch.rand((32, 64, 32, 32)).to(device)
-    seq_images = [torch.rand((32, 64, 32, 32)).to(device) for _ in  range(1)]
+    key_image = torch.rand((32, 64, 32, 32)).to(device)
 
     sublayer = MultiHeadImageAttentionBlock(3, 64, 16, 12, 32, 32).to(device)
-    output, attention = sublayer(query_image, seq_images)
+    output, attention = sublayer(query_image, key_image)
     print(output.shape)
     print(attention.shape)
-    print(attention[0])
+    # sublayer = UpSample(64, 128, 57).to(device)
+    # output = sublayer(query_image)
+    # print(output.shape)
+
