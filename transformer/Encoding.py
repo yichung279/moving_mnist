@@ -12,9 +12,10 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 
 
 class GeographicEncoding(nn.Module):
-    def __init__(self, channel, height, width):
+    def __init__(self,seq_len, channel, height, width):
         super().__init__()
-         # shape (N, C, H, W)
+         # shape (N, L, C, H, W)
+        self.seq_len = seq_len
         self.channel = channel
         self.height = height
         self.width = width
@@ -23,7 +24,8 @@ class GeographicEncoding(nn.Module):
         self.loc = torch.tensor([self.mean, self.mean])
         self.covariance_matrix = torch.tensor([[self.variance, 0], [0, self.variance]])
         self.distribution = MultivariateNormal(self.loc, self.covariance_matrix)
-        self.distribution_map = self.build_distribution_map()
+         #! https://discuss.pytorch.org/t/what-is-the-difference-between-register-buffer-and-register-parameter-of-nn-module/32723
+        self.register_buffer('distribution_map', self.build_distribution_map())
 
 
     def build_distribution_map(self):
@@ -34,7 +36,7 @@ class GeographicEncoding(nn.Module):
             for j in range(self.width):
                 distribution_map[i][j] = self.distribution.log_prob(torch.tensor((i, j))).exp()
 
-        return distribution_map.repeat(self.channel, 1, 1)
+        return distribution_map.repeat(self.seq_len, self.channel, 1, 1)
 
 
     def forward(self, x):
@@ -49,8 +51,10 @@ class GeographicEncoding(nn.Module):
 #
 #
 if '__main__' == __name__:
-    x = torch.ones((2, 64, 64))
-    encoding = GeographicEncoding(2, 64, 64)
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    x = torch.ones((32, 10, 64, 32, 32)).to(device)
+    encoding = GeographicEncoding(10, 64, 32, 32).to(device)
     x = encoding(x)
     # print(encoding.loc, encoding.covariance_matrix, encoding.distribution_map, sep='\n')
-    print(x)
+    print(x.shape)

@@ -153,7 +153,7 @@ class FeedForwardConvBlock(nn.Module):
         return x
 
 
-class DownSample(nn.Module):
+class DownSampleBlock(nn.Module):
     def __init__(self,in_channel, hidden_channel, out_channel, kernel_size=3):
         super().__init__()
         self.downsample = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
@@ -182,7 +182,7 @@ class DownSample(nn.Module):
         return F.relu(x + identity)
 
 
-class UpSample(nn.Module):
+class UpSampleBlock(nn.Module):
     def __init__(self, in_channel, hidden_channel, out_channel, kernel_size=3):
         super().__init__()
         self.upsample = nn.ConvTranspose2d(in_channel, in_channel, kernel_size=2, stride=2)
